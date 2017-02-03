@@ -1,2 +1,4 @@
-# OpenGL-Coursework-1
-Computer Graphics module coursework 2017 Part 1
+#OpenGL Graphics Coursework 1
+###Computer Graphics module coursework 1 2017.
+___
+Send Help!
