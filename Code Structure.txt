@@ -1,0 +1,19 @@
+Code Structure Note for OpenGL Coursework
+*****************************************************
+
+Each 3D model should have it's own geometry object
+Each geometry object should be provided with the position and colour data for each vertice.
+Each geometry object should have an "Add Buffer" call for colour and position data.
+
+Every model in my project will be created by providing and manipulating vertice data that is
+coded in the application rather than loading in models as .OBJ files. This is for simplicity
+of creating and modifying the scene in accordance with music in the final version.
+
+
+*****************************************************
+
+The camera should be in a fixed position in the 3D scene but should sway and nudge according to
+the  music data. 
+i.e on a significant low frequency burst such as a bass or drum hit, the camera should sway to 
+the side slightly. This action shouuld be padded and not an instantaneous action to add to the
+realism of a camera sway.

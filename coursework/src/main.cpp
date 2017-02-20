@@ -1,3 +1,6 @@
+// 2017 Gordon Swan
+// OpenGL Coursework Version 1
+
 #include <glm\glm.hpp>
 #include <graphics_framework.h>
 
@@ -10,12 +13,18 @@ effect eff;
 target_camera cam;
 
 bool load_content() {
-  // Create triangle data
-  vector<vec3> positions{vec3(0.0f, 1.0f, 0.0f), vec3(-1.0f, -1.0f, 0.0f), vec3(1.0f, -1.0f, 0.0f)
+  // Surface plane data
+  vector<vec3> positions{
+	  vec3(-10.0f, 0.0f, -10.0f), vec3(-10.0f, 0.0f, 10.0f), vec3(10.0f, 0.0f, 10.0f),
+	  vec3(-10.0f, 0.0f, -10.0f), vec3(10.0f, 0.0f, 10.0f), vec3(10.0f, 0.0f, -10.0f)
+	  
 
   };
-  // Colours
-  vector<vec4> colours{vec4(1.0f, 0.0f, 0.0f, 1.0f), vec4(1.0f, 0.0f, 0.0f, 1.0f), vec4(1.0f, 0.0f, 0.0f, 1.0f)};
+  // Surface plane colours
+  vector<vec4> colours{
+	  vec4(1.0f, 0.0f, 0.0f, 1.0f), vec4(1.0f, 0.0f, 0.0f, 1.0f), vec4(1.0f, 0.0f, 0.0f, 1.0f),
+	  vec4(1.0f, 0.0f, 0.0f, 1.0f), vec4(1.0f, 0.0f, 0.0f, 1.0f), vec4(1.0f, 0.0f, 0.0f, 1.0f) 
+  };
   // Add to the geometry
   geom.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
   geom.add_buffer(colours, BUFFER_INDEXES::COLOUR_BUFFER);
@@ -27,7 +36,7 @@ bool load_content() {
   eff.build();
 
   // Set camera properties
-  cam.set_position(vec3(0.0f, 0.0f, 10.0f));
+  cam.set_position(vec3(0.0f, 5.0f, 10.0f));
   cam.set_target(vec3(0.0f, 0.0f, 0.0f));
   cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
   return true;
