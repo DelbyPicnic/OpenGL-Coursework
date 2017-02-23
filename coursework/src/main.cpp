@@ -11,7 +11,18 @@ using namespace glm;
 mesh groundPlane;
 mesh stdPyramid;
 effect eff;
-target_camera cam;
+
+free_camera cam;
+double cursor_x;
+double cursor_y;
+
+bool initialise() {
+	// Capture cursor input
+	glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	// Capture initial cursor position
+	glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
+	return true;
+}
 
 bool load_content() {
 	// Surface plane data
@@ -59,9 +70,50 @@ bool load_content() {
 
 
 bool update(float delta_time) {
-  // Update the camera
-  cam.update(delta_time);
-  return true;
+	// The ratio of pixels to rotation - remember the FOV
+	static double ratio_width = quarter_pi<float>() / static_cast<float>(renderer::get_screen_width());
+	static double ratio_height =
+		(quarter_pi<float>() *
+		(static_cast<float>(renderer::get_screen_height()) / static_cast<float>(renderer::get_screen_width()))) /
+		static_cast<float>(renderer::get_screen_height());
+
+	double current_x;
+	double current_y;
+
+	// Get the current cursor position
+	glfwGetCursorPos(renderer::get_window(), &current_x, &current_y);
+	// Calculate delta of cursor positions from last frame
+	double delta_x = current_x - cursor_x;
+	double delta_y = cursor_y - current_y;
+
+	delta_x = delta_x * ratio_width;
+	delta_y = delta_y * ratio_height;
+
+	cam.rotate(delta_x, delta_y);
+	// Use keyboard to move the camera - WSAD
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
+		cam.move(vec3(0.0f, 0.0f, 0.5f));
+	}
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_A)) {
+		cam.move(vec3(-0.5f, 0.0f, 0.0f));
+	}
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_S)) {
+		cam.move(vec3(0.0f, 0.0f, -0.5));
+	}
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_D)) {
+		cam.move(vec3(0.5f, 0.0f, 0.0f));
+	}
+	// Update the camera
+	cam.update(delta_time);
+	// Update cursor pos
+	cursor_x = current_x;
+	cursor_y = current_y;
+
+	// Update cursor pos
+	cursor_x = current_x;
+	cursor_y = current_y;
+
+	return true;
 }
 
 bool render() {
@@ -89,6 +141,7 @@ void main() {
   // Create application
   app application("Graphics Coursework");
   // Set load content, update and render methods
+  application.set_initialise(initialise);
   application.set_load_content(load_content);
   application.set_update(update);
   application.set_render(render);
