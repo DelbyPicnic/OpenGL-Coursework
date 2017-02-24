@@ -8,6 +8,7 @@ using namespace std;
 using namespace graphics_framework;
 using namespace glm;
 
+map<string, mesh> meshes;
 mesh groundPlane;
 mesh stdPyramid;
 mesh skybox;
@@ -37,7 +38,7 @@ bool load_content() {
 
 	// *********************** SKYBOX LOAD ***********************
 	// Create box geometry for skybox
-	skybox = mesh(geometry_builder::create_box(vec3(10.0f, 10.0f, 10.0f)));
+	skybox = mesh(geometry_builder::create_box(vec3(10.0f, 10.0f, 10.0f)));		// Not adding skybox to the meshes map just now, shouldn't need lighting applied.
 	// Scale box by 100
 	skybox.get_transform().scale = vec3(10.0f, 10.0f, 10.0f);
 	// Load the cubemap
@@ -189,7 +190,7 @@ bool render() {
 	renderer::render(stdPyramid);
 
 	// ********************* LIGHTING CONFIG **********************
-	
+	// TODO: Add all meshes to a map that can be iterated
 	return true;
 }
 
