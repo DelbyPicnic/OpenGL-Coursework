@@ -12,11 +12,14 @@ map<string, mesh> meshes;
 mesh groundPlane;
 mesh stdPyramid;
 mesh skybox;
-effect eff;
+
 effect sky_eff;
 effect light_eff;
 
+directional_light light;
+
 cubemap cube_map;
+texture tex;
 
 free_camera cam;
 double cursor_x;
@@ -32,18 +35,22 @@ bool initialise() {
 
 bool load_content() {
 	// ********************** LIGHTING LOAD **********************
-	light_eff.add_shader("shaders/env_light.vert", GL_VERTEX_SHADER);
-	light_eff.add_shader("shaders/env_light.frag", GL_FRAGMENT_SHADER);
+	light.set_ambient_intensity(vec4(0.3f, 0.3f, 0.3f, 1.0f));
+	light.set_light_colour(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	light.set_direction(vec3(1.0f, 1.0f, -1.0f));
+
+	light_eff.add_shader("shaders/gouraud.vert", GL_VERTEX_SHADER);
+	light_eff.add_shader("shaders/gouraud.frag", GL_FRAGMENT_SHADER);
 	light_eff.build();
 
 	// *********************** SKYBOX LOAD ***********************
 	// Create box geometry for skybox
-	skybox = mesh(geometry_builder::create_box(vec3(10.0f, 10.0f, 10.0f)));		// Not adding skybox to the meshes map just now, shouldn't need lighting applied.
+	skybox = mesh(geometry_builder::create_box(vec3(10.0f, 10.0f, 10.0f)));
 	// Scale box by 100
-	skybox.get_transform().scale = vec3(10.0f, 10.0f, 10.0f);
+	skybox.get_transform().scale = vec3(100.0f, 100.0f, 100.0f);
 	// Load the cubemap
-	array<string, 6> filenames = { "textures/sahara_ft.jpg", "textures/sahara_bk.jpg", "textures/sahara_up.jpg",
-		"textures/sahara_dn.jpg", "textures/sahara_rt.jpg", "textures/sahara_lf.jpg" };
+	array<string, 6> filenames = { "textures/cwd_bk.jpg", "textures/cwd_bk.jpg", "textures/cwd_up.jpg",
+		"textures/cwd_dn.jpg", "textures/cwd_rt.jpg", "textures/cwd_lf.jpg" };
 	// Create cube_map
 	cube_map = cubemap(filenames);
 	//Load skybox shaders
@@ -53,41 +60,23 @@ bool load_content() {
 	sky_eff.build();
 
 	// *********************** OBJECTS LOAD **********************
-	// Surface plane data
-	geometry sPlane;
-	vector<vec3> sPlanePos{
-		vec3(-10.0f, 0.0f, -10.0f), vec3(-10.0f, 0.0f, 10.0f), vec3(10.0f, 0.0f, 10.0f),
-		vec3(-10.0f, 0.0f, -10.0f), vec3(10.0f, 0.0f, 10.0f), vec3(10.0f, 0.0f, -10.0f)
-	};
-  
-	// Add surface plane to the geometry
-	sPlane.add_buffer(sPlanePos, BUFFER_INDEXES::POSITION_BUFFER);
+	// Create Scene:
+	meshes["plane"] = mesh(geometry_builder::create_plane(10.0f, 10.0f));
+	meshes["pyramid"] = mesh(geometry_builder::create_pyramid(vec3(5.0f, 5.0f, 5.0f)));
 
-	// Add surface plane geometry to mesh
-	groundPlane = mesh(sPlane);
+	// Set Material Information
+	meshes["plane"].get_material().set_emissive(vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	meshes["plane"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["plane"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["plane"].get_material().set_shininess(25.0f);
 
-	// Pyramid data
-	geometry sPyramid;
-	vector<vec3> sPyramidPos{
-		// Top (pointy bit)
-		vec3(0.0f, 2.0f, 0.0f), vec3(-1.0f, 0.0f, 1.0f), vec3(1.0f, 0.0f, 1.0f),
-		vec3(0.0f, 2.0f, 0.0f), vec3(1.0f, 0.0f, 1.0f), vec3(1.0f, 0.0f, -1.0f),
-		vec3(0.0f, 2.0f, 0.0f), vec3(1.0f, 0.0f, -1.0f), vec3(-1.0f, 0.0f, -1.0f),
-		vec3(0.0f, 2.0f, 0.0f), vec3(-1.0f, 0.0f, -1.0f), vec3(-1.0f, 0.0f, 1.0f)
-	};
-	
-	// Add pyramid to geometry
-	sPyramid.add_buffer(sPyramidPos, BUFFER_INDEXES::POSITION_BUFFER);
+	meshes["pyramid"].get_material().set_emissive(vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	meshes["pyramid"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["pyramid"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["pyramid"].get_material().set_shininess(100.0f);
 
-	// Add pyramid geometry
-	stdPyramid = mesh(sPyramid);
 
-	// Load in shaders
-	eff.add_shader("shaders/basic_colour.vert", GL_VERTEX_SHADER);
-	eff.add_shader("shaders/basic_colour.frag", GL_FRAGMENT_SHADER);
-		
-	// Build effect
-	eff.build();
+	tex = texture("textures/check_1.png");
 
 	// *********************** CAMERA CONFIG **********************
 	// Set camera properties
@@ -171,26 +160,35 @@ bool render() {
 	glDepthMask(GL_TRUE);
 
 	// ********************** OBJECTS RENDER ***********************
-	// Bind effect
-	renderer::bind(eff);
-	// Create MVP matrix
-	M = mat4(1.0f);
-	V = cam.get_view();
-	P = cam.get_projection();
-	MVP = P * V * M;
-	// Set MVP matrix uniform
-	glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+	for (auto &index : meshes) {
+		auto cur_mesh = index.second;
+		// Bind Lighting Effect
+		renderer::bind(light_eff);
+		// Calculate MVP Matrix
+		auto M = cur_mesh.get_transform().get_transform_matrix();
+		auto V = cam.get_view();
+		auto P = cam.get_projection();
+		auto MVP = P * V * M;
+		// Set MVP Matrix Uniform
+		glUniformMatrix4fv(light_eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+		// Set Normal and Model Matrices:
+		glUniformMatrix4fv(light_eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
+		glUniformMatrix3fv(light_eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(cur_mesh.get_transform().get_normal_matrix()));
+		// Bind Material
+		renderer::bind(cur_mesh.get_material(), "mat");
+		// Bind lighting model
+		renderer::bind(light, "light");
+		// Bind Texture
+		renderer::bind(tex, 0);
+		// Set texture uniform
+		glUniform1i(light_eff.get_uniform_location("tex"), 0);
+		// Set eye position uniform
+		glUniform3fv(light_eff.get_uniform_location("eye_pos"), 1, value_ptr(cam.get_position()));
+		// Render mesh
+		renderer::render(cur_mesh);
+	}
 
-	// Set the colour value for the shader
-	glUniform4fv(eff.get_uniform_location("colour"), 1, value_ptr(vec4(0.765f, 0.082f, 0.196f, 1.0f)));
-
-	// Render geometry
-	renderer::render(groundPlane);
-	glUniform4fv(eff.get_uniform_location("colour"), 1, value_ptr(vec4(0.5f, 0.3f, 1.0f, 1.0f)));
-	renderer::render(stdPyramid);
-
-	// ********************* LIGHTING CONFIG **********************
-	// TODO: Add all meshes to a map that can be iterated
+	
 	return true;
 }
 
