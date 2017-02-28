@@ -16,7 +16,7 @@ mesh skybox;
 effect sky_eff;
 effect light_eff;
 
-directional_light light;
+point_light light;
 
 cubemap cube_map;
 texture tex;
@@ -35,12 +35,12 @@ bool initialise() {
 
 bool load_content() {
 	// ********************** LIGHTING LOAD **********************
-	light.set_ambient_intensity(vec4(0.3f, 0.3f, 0.3f, 1.0f));
+	light.set_position(vec3(0.0f, 10.0f, 0.0f));
 	light.set_light_colour(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	light.set_direction(vec3(1.0f, 1.0f, -1.0f));
+	light.set_range(20.0f);
 
-	light_eff.add_shader("shaders/gouraud.vert", GL_VERTEX_SHADER);
-	light_eff.add_shader("shaders/gouraud.frag", GL_FRAGMENT_SHADER);
+	light_eff.add_shader("shaders/point.vert", GL_VERTEX_SHADER);
+	light_eff.add_shader("shaders/point.frag", GL_FRAGMENT_SHADER);
 	light_eff.build();
 
 	// *********************** SKYBOX LOAD ***********************
@@ -177,7 +177,7 @@ bool render() {
 		// Bind Material
 		renderer::bind(cur_mesh.get_material(), "mat");
 		// Bind lighting model
-		renderer::bind(light, "light");
+		renderer::bind(light, "point");
 		// Bind Texture
 		renderer::bind(tex, 0);
 		// Set texture uniform
