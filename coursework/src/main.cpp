@@ -9,6 +9,7 @@ using namespace graphics_framework;
 using namespace glm;
 
 map<string, mesh> meshes;
+map<string, mesh> pillars;
 mesh groundPlane;
 mesh stdPyramid;
 mesh skybox;
@@ -61,26 +62,68 @@ bool load_content() {
 
 	// *********************** OBJECTS LOAD **********************
 	// Create Scene:
-	meshes["plane"] = mesh(geometry_builder::create_plane(10.0f, 10.0f));
+	meshes["plane"] = mesh(geometry_builder::create_plane(75.0f, 75.0f));
 	meshes["pyramid"] = mesh(geometry_builder::create_pyramid(vec3(5.0f, 5.0f, 5.0f)));
 
-	// Set Material Information
+	// Create VU collumns for visualizer
+	meshes["cube01"] = mesh(geometry_builder::create_box(vec3(4.0f, 30.0f, 0.2f)));
+	meshes["cube02"] = mesh(geometry_builder::create_box(vec3(4.0f, 30.0f, 0.2f)));
+	meshes["cube03"] = mesh(geometry_builder::create_box(vec3(4.0f, 30.0f, 0.2f)));
+	
+	meshes["cube01"].get_transform().translate(vec3(-5.0f, 15.0f, -30.0f));
+	meshes["cube02"].get_transform().translate(vec3(0.0f, 15.0f, -30.0f));
+	meshes["cube03"].get_transform().translate(vec3(5.0f, 15.0f, -30.0f));
+	
+	meshes["cube01"].get_material().set_emissive(vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	meshes["cube01"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube01"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube01"].get_material().set_shininess(25.0f);
+
+	meshes["cube02"].get_material().set_emissive(vec4(0.0f, 1.0f, 0.0f, 1.0f));
+	meshes["cube02"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube02"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube02"].get_material().set_shininess(25.0f);
+
+	meshes["cube03"].get_material().set_emissive(vec4(0.0f, 0.0f, 1.0f, 1.0f));
+	meshes["cube03"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube03"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube03"].get_material().set_shininess(25.0f);
+
+	// Set Pyramid & Tetrahedron Information
+	meshes["tetra01"] = mesh(geometry_builder::create_tetrahedron(vec3(6.0f, 4.0f, 8.0f)));
+	meshes["tetra02"] = mesh(geometry_builder::create_tetrahedron(vec3(2.0f, 7.0f, 4.0f)));
+	meshes["tetra03"] = mesh(geometry_builder::create_tetrahedron(vec3(5.0f, 3.0f, 1.0f)));
+
+	meshes["tetra01"].get_transform().translate(vec3(-5.0f, 2.0f, -22.0f));
+	meshes["tetra02"].get_transform().translate(vec3(0.0f, 3.5f, -19.0f));
+	meshes["tetra03"].get_transform().translate(vec3(5.0f, 1.5f, -26.0f));
+
+	meshes["tetra01"].get_material().set_emissive(vec4(1.0f, 0.0f, 1.0f, 1.0f));
+	meshes["tetra01"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra01"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra01"].get_material().set_shininess(25.0f);
+
+	meshes["tetra02"].get_material().set_emissive(vec4(0.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra02"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra02"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra02"].get_material().set_shininess(25.0f);
+
+	meshes["tetra03"].get_material().set_emissive(vec4(1.0f, 1.0f, 0.0f, 1.0f));
+	meshes["tetra03"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra03"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["tetra03"].get_material().set_shininess(25.0f);
+	
+	// Set Plane Information
 	meshes["plane"].get_material().set_emissive(vec4(0.0f, 0.0f, 0.0f, 1.0f));
 	meshes["plane"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	meshes["plane"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	meshes["plane"].get_material().set_shininess(25.0f);
 
-	meshes["pyramid"].get_material().set_emissive(vec4(0.0f, 0.0f, 0.0f, 1.0f));
-	meshes["pyramid"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["pyramid"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["pyramid"].get_material().set_shininess(100.0f);
-
-
 	tex = texture("textures/check_1.png");
 
 	// *********************** CAMERA CONFIG **********************
 	// Set camera properties
-	cam.set_position(vec3(0.0f, 5.0f, 10.0f));
+	cam.set_position(vec3(0.0f, 5.0f, 30.0f));
 	cam.set_target(vec3(0.0f, 0.0f, 0.0f));
 	cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
 	return true;
@@ -187,7 +230,6 @@ bool render() {
 		// Render mesh
 		renderer::render(cur_mesh);
 	}
-
 	
 	return true;
 }
