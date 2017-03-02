@@ -13,14 +13,18 @@ map<string, mesh> pillars;
 mesh groundPlane;
 mesh stdPyramid;
 mesh skybox;
+mesh horizon;
 
 effect sky_eff;
 effect light_eff;
+effect horiz_eff;
 
 point_light light;
 
 cubemap cube_map;
-texture tex;
+texture tex_01;
+texture tex_02;
+texture horizon_tex;
 
 free_camera cam;
 double cursor_x;
@@ -59,6 +63,15 @@ bool load_content() {
 	sky_eff.add_shader("shaders/skybox.frag", GL_FRAGMENT_SHADER);
 	// Build Effect
 	sky_eff.build();
+
+	// *********************** HORIZON LOAD **********************
+	horizon = mesh(geometry_builder::create_cylinder());
+	horizon.get_transform().scale = vec3(200.0f, 50.0f, 200.0f);
+	horizon_tex = texture("textures/wall_02.png");
+
+	horiz_eff.add_shader("shaders/basic_textured.frag", GL_FRAGMENT_SHADER);
+	horiz_eff.add_shader("shaders/basic_textured.vert", GL_VERTEX_SHADER);
+	horiz_eff.build();
 
 	// *********************** OBJECTS LOAD **********************
 	// Create Scene:
@@ -119,7 +132,8 @@ bool load_content() {
 	meshes["plane"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	meshes["plane"].get_material().set_shininess(25.0f);
 
-	tex = texture("textures/check_1.png");
+	tex_01 = texture("textures/floor_tile_01.png");
+	tex_02 = texture("textures/floor_tile_02.png");
 
 	// *********************** CAMERA CONFIG **********************
 	// Set camera properties
@@ -202,6 +216,29 @@ bool render() {
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
 
+	// *********************** SKYBOX RENDER ***********************
+	// Disable Depth Testing, Face Culling and Depth Masking
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+
+	renderer::bind(horiz_eff);
+	// Calculate Horizon MVP
+	M = horizon.get_transform().get_transform_matrix();
+	V = cam.get_view();
+	P = cam.get_projection();
+	MVP = P * V * M;
+	// Set MVP Matrix Uniform 
+	glUniformMatrix4fv(horiz_eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+	// Bind texture
+	renderer::bind(horizon_tex, 1);
+	glUniform1i(horiz_eff.get_uniform_location("tex"), 1);
+	renderer::render(horizon);
+
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+
 	// ********************** OBJECTS RENDER ***********************
 	for (auto &index : meshes) {
 		auto cur_mesh = index.second;
@@ -222,7 +259,7 @@ bool render() {
 		// Bind lighting model
 		renderer::bind(light, "point");
 		// Bind Texture
-		renderer::bind(tex, 0);
+		renderer::bind(tex_01, 0);
 		// Set texture uniform
 		glUniform1i(light_eff.get_uniform_location("tex"), 0);
 		// Set eye position uniform
