@@ -13,18 +13,20 @@ map<string, mesh> pillars;
 mesh groundPlane;
 mesh stdPyramid;
 mesh skybox;
-mesh horizon;
 
 effect sky_eff;
+effect mask_eff;
 effect light_eff;
-effect horiz_eff;
 
 point_light light;
 
 cubemap cube_map;
+texture screen_mask;
 texture tex_01;
 texture tex_02;
-texture horizon_tex;
+
+geometry mask_quad;
+frame_buffer framebuffer;
 
 float t_time = 0.0f;
 float r = 0.0f;
@@ -35,184 +37,9 @@ free_camera cam;
 double cursor_x;
 double cursor_y;
 
-
-// Creates cylinder geometry
-geometry create_tube(const unsigned int stacks, const unsigned int slices,
-	const glm::vec3 &dims) {
-	// Type of geometry generated will be triangles
-	geometry geom;
-	geom.set_type(GL_TRIANGLES);
-	// Declare required buffers - positions, normals, texture coordinates and
-	// colour
-	std::vector<glm::vec3> positions;
-	std::vector<glm::vec3> normals;
-	std::vector<glm::vec2> tex_coords;
-	std::vector<glm::vec4> colours;
-
-	// Minimal and maximal points
-	glm::vec3 minimal(0.0f, 0.0f, 0.0f);
-	glm::vec3 maximal(0.0f, 0.0f, 0.0f);
-
-	// Create top - similar to disk but now using triangles
-	glm::vec3 centre(0.0f, 0.5f * dims.y, 0.0f);
-	// Recalculate minimal and maximal
-	minimal = glm::min(minimal, centre);
-	maximal = glm::max(maximal, centre);
-	auto prev_vert = glm::vec3(0.5f, 0.5f, 0.0f) * dims;
-	// Recalculate minimal and maximal
-	minimal = glm::min(minimal, prev_vert);
-	maximal = glm::max(maximal, prev_vert);
-	glm::vec3 curr_vert;
-	glm::vec2 tex_coord(0.5f, 0.5f);
-	// Angle per slice
-	auto delta_angle = (2.0f * glm::pi<float>()) / static_cast<float>(slices);
-	// Iterate through each slice
-	for (unsigned int i = 1; i <= slices; ++i) {
-		// Calculate unit length vertex
-		curr_vert = glm::vec3(cos(i * delta_angle), 1.0f, -sin(i * delta_angle));
-		// We want radius to be 1
-		curr_vert /= 2.0f;
-		// Multiply by dimensions
-		curr_vert *= dims;
-		// Recalculate minimal and maximal
-		// Recalculate minimal and maximal
-		minimal = glm::min(minimal, curr_vert);
-		maximal = glm::max(maximal, curr_vert);
-		// Push back vertices
-		//positions.push_back(centre);
-		//positions.push_back(prev_vert);
-		//positions.push_back(curr_vert);
-		// Push back normals and colours
-		for (unsigned int j = 0; j < 3; ++j) {
-			//normals.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
-			//colours.push_back(glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
-		}
-		// Push back tex coordinates
-		//tex_coords.push_back(tex_coord);
-		//tex_coords.push_back(glm::vec2(tex_coord.x + prev_vert.x, tex_coord.y - prev_vert.z));
-		//tex_coords.push_back(glm::vec2(tex_coord.x + curr_vert.x, tex_coord.y - curr_vert.z));
-		// Set previous as current
-		prev_vert = curr_vert;
-	}
-
-	// Create bottom - same process as top
-	centre = glm::vec3(0.0f, -0.5f * dims.y, 0.0f);
-	// Recalculate minimal and maximal
-	minimal = glm::min(minimal, centre);
-	maximal = glm::max(maximal, centre);
-
-	prev_vert = glm::vec3(0.5f, -0.5f, 0.0f) * dims;
-	// Recalculate minimal and maximal
-	minimal = glm::min(minimal, prev_vert);
-	maximal = glm::max(maximal, prev_vert);
-	// Iterate for each slice
-	for (unsigned int i = 1; i <= slices; ++i) {
-		// Calculate unit length vertex
-		curr_vert = glm::vec3(cos(i * delta_angle), -1.0f, sin(i * delta_angle));
-		// We want radius to be 1
-		curr_vert /= 2.0f;
-		// Multiply by dimensions
-		curr_vert *= dims;
-		// Recalculate minimal and maximal
-		minimal = glm::min(minimal, curr_vert);
-		maximal = glm::max(maximal, curr_vert);
-		// Push back vertices
-		//positions.push_back(centre);
-		//positions.push_back(prev_vert);
-		//positions.push_back(curr_vert);
-		// Push back normals and colours
-		for (unsigned int j = 0; j < 3; ++j) {
-			//normals.push_back(glm::vec3(0.0f, -1.0f, 0.0f));
-			//colours.push_back(glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
-		}
-		// Push back texture coordinates
-		//tex_coords.push_back(tex_coord);
-		//tex_coords.push_back(glm::vec2(tex_coord.x - prev_vert.x, tex_coord.y - prev_vert.z));
-		//tex_coords.push_back(glm::vec2(tex_coord.x - curr_vert.x, tex_coord.y - curr_vert.z));
-		// Set previous as current
-		prev_vert = curr_vert;
-	}
-
-	// Create stacks
-	std::array<glm::vec3, 4> verts;
-	std::array<glm::vec2, 4> coords;
-	// Delta height - scaled during vertex creation
-	auto delta_height = 2.0f / static_cast<float>(stacks);
-	// Calculate circumference - could be ellipitical
-	auto circ =
-		glm::pi<float>() * ((3.0f * (dims.x + dims.z)) - (sqrtf((3.0f * dims.x + dims.z) * (dims.x + 3.0f * dims.z))));
-	// Delta width is the circumference divided into slices
-	auto delta_width = circ / static_cast<float>(slices);
-	// Iterate through each stack
-	for (unsigned int i = 0; i < stacks; ++i) {
-		// Iterate through each slice
-		for (unsigned int j = 0; j < slices; ++j) {
-			// Caculate vertices
-			verts[0] = glm::vec3(cos(j * delta_angle), 1.0f - (delta_height * i), sin(j * delta_angle));
-			verts[1] = glm::vec3(cos((j + 1) * delta_angle), 1.0f - (delta_height * i), sin((j + 1) * delta_angle));
-			verts[2] = glm::vec3(cos(j * delta_angle), 1.0f - (delta_height * (i + 1)), sin(j * delta_angle));
-			verts[3] = glm::vec3(cos((j + 1) * delta_angle), 1.0f - (delta_height * (i + 1)), sin((j + 1) * delta_angle));
-			// Scale by 0.5 * dims
-			for (auto &v : verts)
-				v *= dims * 0.5f;
-			// Recalculate minimal and maximal
-			for (auto &v : verts) {
-				minimal = glm::min(minimal, v);
-				maximal = glm::max(maximal, v);
-			}
-
-			// Calculate texture coordinates
-			coords[0] = glm::vec2((-delta_width * j) / glm::pi<float>(), dims.y - ((delta_height * i * dims.y) / 2.0f));
-			coords[1] = glm::vec2((-delta_width * (j + 1)) / glm::pi<float>(), dims.y - ((delta_height * i * dims.y) / 2.0f));
-			coords[2] = glm::vec2((-delta_width * j) / glm::pi<float>(), dims.y - ((delta_height * (i + 1) * dims.y) / 2.0f));
-			coords[3] =
-				glm::vec2((-delta_width * (j + 1)) / glm::pi<float>(), dims.y - ((delta_height * (i + 1) * dims.y) / 2.0f));
-
-			// Triangle 1
-			positions.push_back(verts[0]);
-			normals.push_back(glm::normalize(glm::vec3(verts[0].x, 0.0f, verts[0].z)));
-			tex_coords.push_back(coords[0]);
-			positions.push_back(verts[3]);
-			normals.push_back(glm::normalize(glm::vec3(verts[3].x, 0.0f, verts[3].z)));
-			tex_coords.push_back(coords[3]);
-			positions.push_back(verts[2]);
-			normals.push_back(glm::normalize(glm::vec3(verts[2].x, 0.0f, verts[2].z)));
-			tex_coords.push_back(coords[2]);
-			// Triangle 2
-			positions.push_back(verts[0]);
-			normals.push_back(glm::normalize(glm::vec3(verts[0].x, 0.0f, verts[0].z)));
-			tex_coords.push_back(coords[0]);
-			positions.push_back(verts[1]);
-			normals.push_back(glm::normalize(glm::vec3(verts[1].x, 0.0f, verts[1].z)));
-			tex_coords.push_back(coords[1]);
-			positions.push_back(verts[3]);
-			normals.push_back(glm::normalize(glm::vec3(verts[3].x, 0.0f, verts[3].z)));
-			tex_coords.push_back(coords[3]);
-
-			// Colours
-			for (unsigned int k = 0; k < 6; ++k)
-				colours.push_back(glm::vec4(0.7f, 0.7f, 0.7f, 1.0f));
-		}
-	}
-
-	// Set minimal and maximal values
-	geom.set_minimal_point(minimal);
-	geom.set_maximal_point(maximal);
-
-	// Add buffers to geometry
-	geom.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
-	geom.add_buffer(normals, BUFFER_INDEXES::NORMAL_BUFFER);
-	geom.add_buffer(colours, BUFFER_INDEXES::COLOUR_BUFFER);
-	geom.add_buffer(tex_coords, BUFFER_INDEXES::TEXTURE_COORDS_0);
-
-	// Generate tangent and binormal data
-	geom.generate_tb(normals);
-
-	return std::move(geom);
-}
-
-
 bool initialise() {
+	// Set screen size
+	renderer::set_screen_dimensions(1280, 960);
 	// Capture cursor input
 	glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	// Capture initial cursor position
@@ -221,6 +48,17 @@ bool initialise() {
 }
 
 bool load_content() {
+	// ********************** SCREEN MASK ************************
+	framebuffer = frame_buffer(renderer::get_screen_width(), renderer::get_screen_height());
+	vector<vec3> positions{vec3(-1.0f, 1.0f, 0.0f), vec3(-1.0f, -1.0f, 0.0f), vec3(1.0f, -1.0f, 0.0f), vec3(-1.0f, 1.0f, 0.0f), vec3(1.0f, -1.0f, 0.0f), vec3(1.0f, 1.0f, 0.0f)};
+	vector<vec2> tex_coords{vec2(0.0f, 1.0f), vec2(0.0f, 0.0f), vec2(1.0f, 0.0f), vec2(0.0f, 1.0f), vec2(1.0f, 0.0f), vec2(1.0f, 1.0f)};
+	mask_quad.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
+	mask_quad.add_buffer(tex_coords, BUFFER_INDEXES::TEXTURE_COORDS_0);
+	screen_mask = texture("textures/ie_4.png");
+	mask_eff.add_shader("shaders/simple_texture.vert", GL_VERTEX_SHADER);
+	mask_eff.add_shader("shaders/mask.frag", GL_FRAGMENT_SHADER);
+	mask_eff.build();
+
 	// ********************** LIGHTING LOAD **********************
 	light.set_position(vec3(0.0f, 10.0f, 0.0f));
 	light.set_light_colour(vec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -245,16 +83,7 @@ bool load_content() {
 	sky_eff.add_shader("shaders/skybox.frag", GL_FRAGMENT_SHADER);
 	// Build Effect
 	sky_eff.build();
-
-	// *********************** HORIZON LOAD **********************
-	horizon = mesh(create_tube(10, 10, vec3(1.0f, 1.0f, 1.0f)));
-	horizon.get_transform().scale = vec3(200.0f, 50.0f, 200.0f);
-	horizon_tex = texture("textures/wall_02.png");
-
-	horiz_eff.add_shader("shaders/basic_textured.frag", GL_FRAGMENT_SHADER);
-	horiz_eff.add_shader("shaders/basic_textured.vert", GL_VERTEX_SHADER);
-	horiz_eff.build();
-
+		
 	// *********************** OBJECTS LOAD **********************
 	// Create Scene:
 	meshes["plane"] = mesh(geometry_builder::create_plane(75.0f, 75.0f));
@@ -326,25 +155,7 @@ bool load_content() {
 }
 
 
-bool update(float delta_time) {
-	// *********************** UPDATE SHAPES **********************
-	t_time += delta_time;
-	r = 1.0f + sinf(t_time);
-	r = r / 8;
-
-	s = 1.0f + cosf(t_time);
-	s = s / 6;
-
-	meshes["tetra01"].get_transform().rotate(vec3(0.0f, r, 0.0f));
-	meshes["tetra02"].get_transform().rotate(vec3(0.0f, r*-0.5, 0.0f));
-	meshes["tetra03"].get_transform().rotate(vec3(0.0f, r/2, 0.0f));
-	
-	r *= 5;
-	s *= 5;
-
-	meshes["tetra01"].get_transform().scale = vec3(s, 1.0f, s);
-	meshes["tetra02"].get_transform().scale = vec3(r, 1.0f, s);
-	meshes["tetra03"].get_transform().scale = vec3(s, 1.0f, r);
+bool update(float delta_time) {	
 	// *********************** CAMERA CONTROL *********************
 	// The ratio of pixels to rotation - remember the FOV
 	static double ratio_width = quarter_pi<float>() / static_cast<float>(renderer::get_screen_width());
@@ -393,6 +204,12 @@ bool update(float delta_time) {
 }
 
 bool render() {
+
+	// *********************** RENDER CONFIG ***********************
+	renderer::set_render_target(framebuffer);
+	renderer::clear();
+	// This will render to the framebuffer until instructed otherwise.
+
 	// *********************** SKYBOX RENDER ***********************
 	// Disable Depth Testing, Face Culling and Depth Masking
 	glDisable(GL_CULL_FACE);
@@ -416,30 +233,7 @@ bool render() {
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
-
-	// *********************** SKYBOX RENDER ***********************
-	// Disable Depth Testing, Face Culling and Depth Masking
-	glDisable(GL_CULL_FACE);
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_FALSE);
-
-	renderer::bind(horiz_eff);
-	// Calculate Horizon MVP
-	M = horizon.get_transform().get_transform_matrix();
-	V = cam.get_view();
-	P = cam.get_projection();
-	MVP = P * V * M;
-	// Set MVP Matrix Uniform 
-	glUniformMatrix4fv(horiz_eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
-	// Bind texture
-	renderer::bind(horizon_tex, 1);
-	glUniform1i(horiz_eff.get_uniform_location("tex"), 1);
-	renderer::render(horizon);
-
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
-
+		
 	// ********************** OBJECTS RENDER ***********************
 	for (auto &index : meshes) {
 		auto cur_mesh = index.second;
@@ -477,7 +271,21 @@ bool render() {
 		// Render mesh
 		renderer::render(cur_mesh);
 	}
-	
+	// *********************** RENDER CONFIG ***********************
+	renderer::set_render_target();
+	// This will direct the render target back to the window.
+
+	// ********************* SCREEN MASK RENDER ******************** 
+	renderer::bind(mask_eff);
+	MVP = mat4(1);
+	glUniformMatrix4fv(mask_eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+	glUniform4fv(mask_eff.get_uniform_location("clear_colour"), 1, value_ptr(vec4(0.94f, 0.13f, 0.61f, 1.0f)));
+	renderer::bind(framebuffer.get_frame(), 0);
+	glUniform1i(mask_eff.get_uniform_location("tex"), 0);
+	renderer::bind(screen_mask, 1);
+	glUniform1i(mask_eff.get_uniform_location("alpha_map"), 1); 
+	renderer::render(mask_quad);
+
 	return true;
 }
 
