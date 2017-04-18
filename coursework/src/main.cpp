@@ -3,6 +3,9 @@
 
 #include <glm\glm.hpp>
 #include <graphics_framework.h>
+#include "fftw3.h"
+#include "SDL.h"
+#undef main
 
 using namespace std;
 using namespace graphics_framework;
@@ -28,6 +31,20 @@ texture tex_02;
 geometry mask_quad;
 frame_buffer framebuffer;
 
+// SDL & FFTW Stuff
+struct AudioData {
+	Uint8* filePosition;
+	Uint32 fileLength;
+};
+
+Uint8* sampData;
+SDL_AudioSpec wavSpec;
+Uint8* wavStart;
+Uint32 wavLength;
+SDL_AudioDeviceID aDevice;
+
+#define FILE_PATH "C:\\Users\\40202556\\Desktop\\OpenGL-Coursework\\coursework\\res\\audio\\testFile.wav"
+
 float t_time = 0.0f;
 float r = 0.0f;
 float s = 0.0f;
@@ -37,6 +54,24 @@ free_camera cam;
 double cursor_x;
 double cursor_y;
 
+void PlayAudioCallback(void* userData, Uint8* stream, int streamLength) {
+	AudioData* audio = (AudioData*)userData;
+	sampData = new Uint8;
+
+	if (audio->fileLength == 0) {
+		return;
+	}
+
+	Uint32 length = (Uint32)streamLength;
+	length = (length > audio->fileLength ? audio->fileLength : length);
+
+	SDL_memcpy(stream, audio->filePosition, length);
+	sampData = stream;
+
+	audio->filePosition += length;
+	audio->fileLength -= length;
+}
+
 bool initialise() {
 	// Set screen size
 	renderer::set_screen_dimensions(1280, 960);
@@ -44,6 +79,9 @@ bool initialise() {
 	glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	// Capture initial cursor position
 	glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
+
+	
+
 	return true;
 }
 
@@ -297,7 +335,42 @@ void main() {
 	application.set_load_content(load_content);
 	application.set_update(update);
 	application.set_render(render);
+
+	// ********************** FFTW INIT **************************
+	int N;
+	fftw_complex *in, *out;
+	fftw_plan my_plan;	/*in = (fftw_complex*)fftwf_malloc(sizeof(fftw_complex)*N);
+	out = (fftw_complex*)fftwf_malloc(sizeof(fftw_complex)*N);
+	my_plan = fftw_plan_dft*/
+	
+
+	// *********************** SDL INIT **************************
+	SDL_Init(SDL_INIT_AUDIO);
+	cout << "SDL Audio Init Complete" << endl;
+	if (SDL_LoadWAV(FILE_PATH, &wavSpec, &wavStart, &wavLength) == NULL) {
+		cerr << "Couldnt load file: " << FILE_PATH << endl;
+		getchar();		
+	}
+	cout << "Loaded " << FILE_PATH << endl;
+	AudioData audio;
+	audio.filePosition = wavStart;
+	audio.fileLength = wavLength;
+
+	wavSpec.callback = PlayAudioCallback;
+	wavSpec.userdata = &audio;
+
+	aDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
+	cout << "Opening Audio Stream" << endl;
+	if (aDevice == 0) {
+		cerr << "Audio Device connection failed: " << SDL_GetError() << endl;
+		getchar();		
+	}
+	SDL_PauseAudioDevice(aDevice, 0);
+
 	// Run application
 	application.run();
+	
+	
+
 }
 
