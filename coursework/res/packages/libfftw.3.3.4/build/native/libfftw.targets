@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" InitialTargets="libfftw_init">
+  <PropertyGroup Label="Default initializers for properties">
+    <Linkage-libfftw Condition="'$(Linkage-libfftw)' == ''">dynamic</Linkage-libfftw>
+    <CallingConvention-libfftw Condition="'$(CallingConvention-libfftw)' == ''">cdecl</CallingConvention-libfftw>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)../..//build/native/include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)../..//build/native/include/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Label="x64" Condition="'$(Platform.ToLower())' == 'x64'">
+    <Link>
+      <AdditionalDependencies>$(MSBuildThisFileDirectory)../..//build/native/lib/x64\libfftw3f-3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <PropertyPageSchema Include="$(MSBuildThisFileDirectory)\default-propertiesui.xml" />
+  </ItemGroup>
+  <UsingTask TaskName="libfftw_Contains" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll" TaskFactory="CodeTaskFactory">
+    <ParameterGroup>
+      <Text Output="false" ParameterType="System.String" />
+      <Library Output="false" Required="true" ParameterType="System.String" />
+      <Value Output="false" Required="true" ParameterType="System.String" />
+      <Result Output="true" ParameterType="System.String" />
+    </ParameterGroup>
+    <Task>
+      <Code>Result = ((Text ?? "").Split(';').Contains(Library) ) ? Value : String.Empty;</Code>
+    </Task>
+  </UsingTask>
+  <Target Name="libfftw_init">
+    <libfftw_Contains Text="Linkage-dynamic" Library="libfftw" Value="dynamic" Condition="'$(Linkage-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="Linkage-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="Linkage-static" Library="libfftw" Value="static" Condition="'$(Linkage-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="Linkage-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="Linkage-ltcg" Library="libfftw" Value="ltcg" Condition="'$(Linkage-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="Linkage-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="Linkage-sxs" Library="libfftw" Value="sxs" Condition="'$(Linkage-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="Linkage-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="CallingConvention-cdecl" Library="libfftw" Value="cdecl" Condition="'$(CallingConvention-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="CallingConvention-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="CallingConvention-stdcall" Library="libfftw" Value="stdcall" Condition="'$(CallingConvention-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="CallingConvention-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="CallingConvention-fastcall" Library="libfftw" Value="fastcall" Condition="'$(CallingConvention-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="CallingConvention-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="CallingConvention-thiscall" Library="libfftw" Value="thiscall" Condition="'$(CallingConvention-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="CallingConvention-libfftw" />
+    </libfftw_Contains>
+    <libfftw_Contains Text="CallingConvention-clrcall" Library="libfftw" Value="clrcall" Condition="'$(CallingConvention-libfftw)'==''">
+      <Output TaskParameter="Result" PropertyName="CallingConvention-libfftw" />
+    </libfftw_Contains>
+  </Target>
+</Project>

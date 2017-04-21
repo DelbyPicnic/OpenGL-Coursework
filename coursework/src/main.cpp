@@ -32,18 +32,28 @@ geometry mask_quad;
 frame_buffer framebuffer;
 
 // SDL & FFTW Stuff
+#define FILE_PATH "C:\\Users\\40202556\\Desktop\\OpenGL-Coursework\\coursework\\res\\audio\\testFile.wav"
+#define CHUNK_SIZE 2048
+
 struct AudioData {
 	Uint8* filePosition;
 	Uint32 fileLength;
 };
 
-Uint8* sampData;
 SDL_AudioSpec wavSpec;
 Uint8* wavStart;
 Uint32 wavLength;
 SDL_AudioDeviceID aDevice;
 
-#define FILE_PATH "C:\\Users\\40202556\\Desktop\\OpenGL-Coursework\\coursework\\res\\audio\\testFile.wav"
+
+
+Uint16 samples[CHUNK_SIZE];
+Uint16 window[CHUNK_SIZE];
+fftw_complex s_in[CHUNK_SIZE], s_out[CHUNK_SIZE];;
+fftw_plan plan;
+double freq_range[] = { 19.0, 120.0, 350.0, 500.0, 750.0, 1000.0, 2200.0, 5200.0 };
+double freq_bin[] = { -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308 };
+double freq_plot[] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 float t_time = 0.0f;
 float r = 0.0f;
@@ -54,9 +64,10 @@ free_camera cam;
 double cursor_x;
 double cursor_y;
 
+
+
 void PlayAudioCallback(void* userData, Uint8* stream, int streamLength) {
-	AudioData* audio = (AudioData*)userData;
-	sampData = new Uint8;
+	AudioData* audio = (AudioData*)userData;	
 
 	if (audio->fileLength == 0) {
 		return;
@@ -65,8 +76,55 @@ void PlayAudioCallback(void* userData, Uint8* stream, int streamLength) {
 	Uint32 length = (Uint32)streamLength;
 	length = (length > audio->fileLength ? audio->fileLength : length);
 
+	// Fill audio buffer with more samples
 	SDL_memcpy(stream, audio->filePosition, length);
-	sampData = stream;
+	// Fill FFT buffer with sampling chunk
+	SDL_memcpy(samples, audio->filePosition, CHUNK_SIZE * sizeof(Uint16));
+
+	double magnitude;
+
+	// Fill Complex_FFT.REAL with sample
+	for (int i = 0; i < CHUNK_SIZE; i++) {
+		s_in[i][0] = samples[i];
+		s_in[1][1] = 0;
+	}
+
+	fftw_execute(plan);
+
+	double max_peak = -1.7E-308;
+	double max_index = -1;
+
+	for (int i = 0; i < 6; i++) {
+		if (freq_bin > 0) {
+			freq_bin[i] = 0;
+		}
+	}
+	
+
+	// Calculate power spectrum
+	for (int i = 1; i < CHUNK_SIZE / 2 - 1; i++) {
+		double real = s_out[i][0];
+		double imag = s_out[i][1];
+		magnitude = sqrt((real*real) + (imag*imag));
+
+		double freq = (i * 44100) / CHUNK_SIZE;
+
+		for (int j = 0; j < 7; j++) {
+			if ((freq > freq_range[j]) && (freq <= freq_range[j + 1])) {
+				if (magnitude > freq_bin[j]) {
+					freq_bin[j] = magnitude;
+					if (freq_plot[j] < magnitude) {
+						freq_plot[j] += magnitude/2;
+					}
+				}
+			}
+		}
+		/*if (magnitude > max_peak) {
+			max_peak = magnitude;
+			max_index = i;
+		}*/
+	}
+	
 
 	audio->filePosition += length;
 	audio->fileLength -= length;
@@ -79,8 +137,6 @@ bool initialise() {
 	glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	// Capture initial cursor position
 	glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
-
-	
 
 	return true;
 }
@@ -124,17 +180,22 @@ bool load_content() {
 		
 	// *********************** OBJECTS LOAD **********************
 	// Create Scene:
-	meshes["plane"] = mesh(geometry_builder::create_plane(75.0f, 75.0f));
-	meshes["pyramid"] = mesh(geometry_builder::create_pyramid(vec3(5.0f, 5.0f, 5.0f)));
+	meshes["plane"] = mesh(geometry_builder::create_plane(75.0f, 75.0f));	
 
 	// Create VU collumns for visualizer
-	meshes["cube01"] = mesh(geometry_builder::create_box(vec3(4.0f, 30.0f, 0.2f)));
-	meshes["cube02"] = mesh(geometry_builder::create_box(vec3(4.0f, 30.0f, 0.2f)));
-	meshes["cube03"] = mesh(geometry_builder::create_box(vec3(4.0f, 30.0f, 0.2f)));
+	meshes["cube01"] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
+	meshes["cube02"] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
+	meshes["cube03"] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
+	meshes["cube04"] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
+	meshes["cube05"] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
+	meshes["cube06"] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
 	
-	meshes["cube01"].get_transform().translate(vec3(-5.0f, 15.0f, -30.0f));
-	meshes["cube02"].get_transform().translate(vec3(0.0f, 15.0f, -30.0f));
-	meshes["cube03"].get_transform().translate(vec3(5.0f, 15.0f, -30.0f));
+	meshes["cube01"].get_transform().translate(vec3(-17.0f, 0.0f, -30.0f));
+	meshes["cube02"].get_transform().translate(vec3(-11.0f, 0.0f, -30.0f));
+	meshes["cube03"].get_transform().translate(vec3(-5.0f, 0.0f, -30.0f));
+	meshes["cube04"].get_transform().translate(vec3(1.0f, 0.0f, -30.0f));
+	meshes["cube05"].get_transform().translate(vec3(7.0f, 0.0f, -30.0f));
+	meshes["cube06"].get_transform().translate(vec3(13.0f, 0.0f, -30.0f));
 	
 	meshes["cube01"].get_material().set_emissive(vec4(1.0f, 0.0f, 0.0f, 1.0f));
 	meshes["cube01"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -151,29 +212,21 @@ bool load_content() {
 	meshes["cube03"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	meshes["cube03"].get_material().set_shininess(25.0f);
 
-	// Set Pyramid & Tetrahedron Information
-	meshes["tetra01"] = mesh(geometry_builder::create_tetrahedron(vec3(6.0f, 4.0f, 8.0f)));
-	meshes["tetra02"] = mesh(geometry_builder::create_tetrahedron(vec3(2.0f, 7.0f, 4.0f)));
-	meshes["tetra03"] = mesh(geometry_builder::create_tetrahedron(vec3(5.0f, 3.0f, 1.0f)));
+	meshes["cube04"].get_material().set_emissive(vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	meshes["cube04"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube04"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube04"].get_material().set_shininess(25.0f);
 
-	meshes["tetra01"].get_transform().translate(vec3(-5.0f, 2.0f, -22.0f));
-	meshes["tetra02"].get_transform().translate(vec3(0.0f, 3.5f, -19.0f));
-	meshes["tetra03"].get_transform().translate(vec3(5.0f, 1.5f, -26.0f));
+	meshes["cube05"].get_material().set_emissive(vec4(0.0f, 1.0f, 0.0f, 1.0f));
+	meshes["cube05"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube05"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube05"].get_material().set_shininess(25.0f);
 
-	meshes["tetra01"].get_material().set_emissive(vec4(1.0f, 0.0f, 1.0f, 1.0f));
-	meshes["tetra01"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra01"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra01"].get_material().set_shininess(25.0f);
+	meshes["cube06"].get_material().set_emissive(vec4(0.0f, 0.0f, 1.0f, 1.0f));
+	meshes["cube06"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube06"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["cube06"].get_material().set_shininess(25.0f);
 
-	meshes["tetra02"].get_material().set_emissive(vec4(0.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra02"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra02"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra02"].get_material().set_shininess(25.0f);
-
-	meshes["tetra03"].get_material().set_emissive(vec4(1.0f, 1.0f, 0.0f, 1.0f));
-	meshes["tetra03"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra03"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	meshes["tetra03"].get_material().set_shininess(25.0f);
 	
 	// Set Plane Information
 	meshes["plane"].get_material().set_emissive(vec4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -194,6 +247,20 @@ bool load_content() {
 
 
 bool update(float delta_time) {	
+	// ********************* VISUALISER UPDATE ********************
+	for (int i = 0; i < 6; i++) {
+		if (freq_plot[i] > 0) {
+			freq_plot[i] = freq_plot[i] - 100000;
+		}
+	}
+
+	meshes["cube01"].get_transform().scale = vec3(1.0f, freq_plot[0] * 0.000001, 1.0f);
+	meshes["cube02"].get_transform().scale = vec3(1.0f, freq_plot[1] * 0.000001, 1.0f);
+	meshes["cube03"].get_transform().scale = vec3(1.0f, freq_plot[2] * 0.000001, 1.0f);
+	meshes["cube04"].get_transform().scale = vec3(1.0f, freq_plot[3] * 0.000001, 1.0f);
+	meshes["cube05"].get_transform().scale = vec3(1.0f, freq_plot[4] * 0.000001, 1.0f);
+	meshes["cube06"].get_transform().scale = vec3(1.0f, freq_plot[5] * 0.000001, 1.0f);
+
 	// *********************** CAMERA CONTROL *********************
 	// The ratio of pixels to rotation - remember the FOV
 	static double ratio_width = quarter_pi<float>() / static_cast<float>(renderer::get_screen_width());
@@ -339,10 +406,14 @@ void main() {
 	// ********************** FFTW INIT **************************
 	int N;
 	fftw_complex *in, *out;
-	fftw_plan my_plan;	/*in = (fftw_complex*)fftwf_malloc(sizeof(fftw_complex)*N);
+	fftw_plan my_plan;
+
+	/*in = (fftw_complex*)fftwf_malloc(sizeof(fftw_complex)*N);
 	out = (fftw_complex*)fftwf_malloc(sizeof(fftw_complex)*N);
 	my_plan = fftw_plan_dft*/
-	
+	
+
+
 
 	// *********************** SDL INIT **************************
 	SDL_Init(SDL_INIT_AUDIO);
@@ -358,6 +429,8 @@ void main() {
 
 	wavSpec.callback = PlayAudioCallback;
 	wavSpec.userdata = &audio;
+
+	plan = fftw_plan_dft_1d(1024, s_in, s_out, FFTW_FORWARD, FFTW_ESTIMATE);
 
 	aDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
 	cout << "Opening Audio Stream" << endl;
