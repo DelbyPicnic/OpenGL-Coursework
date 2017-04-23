@@ -25,6 +25,10 @@ uniform material mat;
 uniform vec3 eye_pos;
 // Texture
 uniform sampler2D tex;
+// Grayscale Constant
+const vec3 intensity = vec3(0.299, 0.587, 0.184);
+// Grayscale Enabler
+uniform int isColour;
 
 // Incoming position
 layout(location = 0) in vec3 vertex_position;
@@ -64,6 +68,11 @@ void main() {
 	vec4 primary = mat.emissive + diffuse;
 	// Calculate final colour - remember alpha
 	colour = primary * samp_tex + specular;
-	colour.a = 1.0;
+	if(isColour == 0){
+		// Apply Grayscale Filter
+		float i = dot(intensity, vec3(colour).xyz);
+		colour = vec4(i,i,i,colour.a) ;
+	}
+	
 	// *********************************
 }

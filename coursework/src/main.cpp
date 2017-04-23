@@ -27,15 +27,23 @@ cubemap cube_map;
 texture screen_mask;
 texture tex_01;
 texture tex_02;
+texture tex_sun;
+texture tex_tree_l;
+texture tex_tree_r;
+texture tex_info;
 
 geometry mask_quad;
 frame_buffer framebuffer;
 
+int enableColour = 1;
+
 // SDL & FFTW Stuff
-#define FILE_PATH "C:\\Users\\40202556\\Desktop\\OpenGL-Coursework\\coursework\\res\\audio\\testFile.wav"
-#define CHUNK_SIZE 2048
-#define BIN_COUNT 50
+#define FILE_PATH "audio\\music.wav"
+#define CHUNK_SIZE 1024
+#define BIN_COUNT 70
 #define DECAY_FACTOR 10
+#define LOWEST_RANGE 20
+#define HIGHEST_RANGE 5800
 
 struct AudioData {
 	Uint8* filePosition;
@@ -51,9 +59,11 @@ Uint16 samples[CHUNK_SIZE];
 Uint16 window[CHUNK_SIZE];
 fftw_complex s_in[CHUNK_SIZE], s_out[CHUNK_SIZE];;
 fftw_plan plan;
-double freq_range[] = { 19.0, 120.0, 350.0, 500.0, 750.0, 1000.0, 15000.0, 17000.0 };
-double freq_bin[] = { -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308, -1.7E-308 };
-double freq_plot[] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+float fft_window[CHUNK_SIZE];
+
+double freq_range[BIN_COUNT];
+double freq_bin[BIN_COUNT];
+double freq_plot[BIN_COUNT];
 
 float t_time = 0.0f;
 float r = 0.0f;
@@ -89,15 +99,6 @@ void PlayAudioCallback(void* userData, Uint8* stream, int streamLength) {
 
 	fftw_execute(plan);
 
-	double max_peak = -1.7E-308;
-	double max_index = -1;
-
-	for (int i = 0; i < 6; i++) {
-		if (freq_bin > 0) {
-			freq_bin[i] = 0;
-		}
-	}
-
 	// Calculate power spectrum
 	for (int i = 1; i < CHUNK_SIZE / 2 - 1; i++) {
 		double real = s_out[i][0];
@@ -106,13 +107,10 @@ void PlayAudioCallback(void* userData, Uint8* stream, int streamLength) {
 
 		double freq = (i * 44100) / CHUNK_SIZE;
 
-		for (int j = 0; j < 7; j++) {
+		for (int j = 0; j < BIN_COUNT; j++) {
 			if ((freq > freq_range[j]) && (freq <= freq_range[j + 1])) {
 				if (magnitude > freq_bin[j]) {
 					freq_bin[j] = magnitude;
-					if (freq_plot[j] < magnitude) {
-						freq_plot[j] += magnitude/2;
-					}
 				}
 			}
 		}
@@ -120,6 +118,29 @@ void PlayAudioCallback(void* userData, Uint8* stream, int streamLength) {
 
 	audio->filePosition += length;
 	audio->fileLength -= length;
+}
+
+// Windowing Functions:
+// These window functions are my own interpretation of the default algorithms.
+// I'm not 100% sure they are correct, with more time i could perfect the visualiser.
+// With more time i could also visit the moon :/
+
+// n is represented by a const 1.0, but to my understanding it should be relative,
+// no idea where it comes from in this implementation tho. Bost functions work okayish so whatever...
+
+// Hamming Window Function
+void hamming(int windowLength, float *buffer) {
+	for (int i = 0; i < windowLength; i++) {
+		double a = 2 * M_PI * (i / ((windowLength - 1)));
+		buffer[i] = 0.54 - (0.46 * cos(a * 1.0));
+	}
+}
+// Blackman Harris Window Function
+void blackman_harris(int windowLength, float *buffer) {
+	for (int i = 0; i < windowLength; i++) {
+		double a = 2 * M_PI * (i / ((windowLength - 1)));
+		buffer[i] = 0.35875 - 0.48829*cos(a*1.0) + 0.14128*cos(2 * a*1.0) - 0.01168*cos(3 * a*1.0);
+	}
 }
 
 bool initialise() {
@@ -172,42 +193,98 @@ bool load_content() {
 		
 	// *********************** OBJECTS LOAD **********************
 	// Create Scene:
-	meshes["plane"] = mesh(geometry_builder::create_plane(75.0f, 75.0f));	
+	meshes["plane"] = mesh(geometry_builder::create_plane(300.0f, 300.0f));
+
+	// Create Sun Element
+	
+	meshes["sun"] = mesh(geometry_builder::create_box(vec3(75.0f, 75.0f, 0.01f)));
+
+	meshes["sun"].get_material().set_emissive(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["sun"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["sun"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["sun"].get_material().set_shininess(25.0f);
+
+	// Translate Sun into place
+	meshes["sun"].get_transform().translate(vec3(0.0f, 19.0f, -110.0f));
+	meshes["sun"].get_transform().rotate(vec3(0.0f, 0.0f, half_pi<float>() * 2));
+
+	// Create Tree Element
+	
+	for (int i = 0; i < 10; i++) {
+		string leftTree = "tree_left_" + to_string(i);
+		string rightTree = "tree_right_" + to_string(i);
+		meshes[leftTree] = mesh(geometry_builder::create_box(vec3(15.0f, 23.3f, 0.01f)));
+		meshes[rightTree] = mesh(geometry_builder::create_box(vec3(15.0f, 23.0f, 0.01f)));
+
+		meshes[leftTree].get_material().set_emissive(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+		meshes[leftTree].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f)); 
+		meshes[leftTree].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+		meshes[leftTree].get_material().set_shininess(25.0f);
+
+		meshes[rightTree].get_material().set_emissive(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+		meshes[rightTree].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+		meshes[rightTree].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+		meshes[rightTree].get_material().set_shininess(25.0f);
+
+		meshes[leftTree].get_transform().translate(vec3(30.0+i*10, 7.5f, -100.0f + i*10));
+		meshes[leftTree].get_transform().rotate(vec3(0.0f, M_PI/4, M_PI));
+
+		meshes[rightTree].get_transform().translate(vec3(-30.0f-i*10, 7.5f, -100.0f + i*10));
+		meshes[rightTree].get_transform().rotate(vec3(0.0f, -M_PI/4, M_PI));
+	}
 
 	// Create VU collumns for visualiser.
-	int _barWidth = 2;
-	int _barSpacing = 3;
-	double _midPoint = (_barWidth*BIN_COUNT) + (_barSpacing*(BIN_COUNT - 1))/2;
+	float _barWidth = 1.5;
+	float _barSpacing = 0.2;
+	double _midPoint = (_barWidth*BIN_COUNT) + (_barSpacing*(BIN_COUNT - 1));
 
 	for (int i = 0; i < BIN_COUNT; i++) {
 		string meshName = "bar_" + to_string(i);
-		float xPos = (i * _barWidth) + (i * _barSpacing);
+		float xPos = (i * _barWidth) + (i * _barSpacing) - _midPoint /2;
 		// Create Mesh:
-		meshes[meshName] = mesh(geometry_builder::create_box(vec3(4.0f, 5.0f, 0.2f)));
+		meshes[meshName] = mesh(geometry_builder::create_box(vec3(_barWidth, 5.0f, 0.2f)));
 		// Translate Mesh:
-		meshes[meshName].get_transform().translate(vec3(xPos, 0.0f, -30.0f));
+		meshes[meshName].get_transform().translate(vec3(xPos, 20.0f, -100.0f));
 		// Set Mesh Material Properties
-		meshes[meshName].get_material().set_emissive(vec4(1.0f, 0.0f, 0.0f, 1.0f));
+		meshes[meshName].get_material().set_emissive(vec4(1.0f, 0.2f, 1.0f, 1.0f));
 		meshes[meshName].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 		meshes[meshName].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 		meshes[meshName].get_material().set_shininess(25.0f);
 	}
+	geometry infoWindow;
+	vector<vec3> info_positions{ vec3(-1.0f, 1.0f, 0.0f), vec3(-1.0f, -1.0f, 0.0f), vec3(1.0f, -1.0f, 0.0f), vec3(-1.0f, 1.0f, 0.0f), vec3(1.0f, -1.0f, 0.0f), vec3(1.0f, 1.0f, 0.0f) };
+	vector<vec2> info_tex_coords{ vec2(0.0f, 1.0f), vec2(0.0f, 0.0f), vec2(1.0f, 0.0f), vec2(0.0f, 1.0f), vec2(1.0f, 0.0f), vec2(1.0f, 1.0f) };
+	infoWindow.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
+	infoWindow.add_buffer(tex_coords, BUFFER_INDEXES::TEXTURE_COORDS_0);
 
+	meshes["info"] = mesh(infoWindow);
+	meshes["info"].get_transform().translate(vec3(0.0f, 2.0f, 5.0f));
+	meshes["info"].get_transform().scale = vec3(7.0f, 6.0f, 1.0f);
+	meshes["info"].get_transform().rotate(vec3(-M_PI/2.5, 0.0f, 0.0f));
 
-	
+	meshes["info"].get_material().set_emissive(vec4(0.5f, 0.5f, 0.5f, 1.0f));
+	meshes["info"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["info"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	meshes["info"].get_material().set_shininess(25.0f);
 	
 	// Set Plane Information
-	meshes["plane"].get_material().set_emissive(vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	meshes["plane"].get_material().set_emissive(vec4(0.5f, 0.5f, 0.5f, 1.0f));
 	meshes["plane"].get_material().set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	meshes["plane"].get_material().set_specular(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	meshes["plane"].get_material().set_shininess(25.0f);
 
 	tex_01 = texture("textures/floor_tile_01.png");
 	tex_02 = texture("textures/floor_tile_02.png");
+	tex_sun = texture("textures/sun.png");
+	tex_tree_r = texture("textures/tree_right.png");
+	tex_tree_l = texture("textures/tree_left.png");
+	tex_info = texture("textures/win98se.png");
+
+	SDL_PauseAudioDevice(aDevice, 0);
 
 	// *********************** CAMERA CONFIG **********************
 	// Set camera properties
-	cam.set_position(vec3(0.0f, 5.0f, 30.0f));
+	cam.set_position(vec3(0.0f, 8.0f, 30.0f));
 	cam.set_target(vec3(0.0f, 0.0f, 0.0f));
 	cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
 	return true;
@@ -216,11 +293,20 @@ bool load_content() {
 
 bool update(float delta_time) {	
 	// ********************* VISUALISER UPDATE ********************
-	for (int i = 0; i < 6; i++) {
-		if (freq_plot[i] > 0) {
-			freq_plot[i] = freq_plot[i] - 100000;
+	// Scale each bar along the y-axis by the respective frequency bin value.
+
+	for (int i = 0; i < BIN_COUNT; i++) {		
+		freq_bin[i] -= 100000;
+		if (freq_bin[i] < 0) {
+			freq_bin[i] = 0;
 		}
-	}	
+	}
+
+	for (int i = 0; i < BIN_COUNT; i++) {
+		string meshName = "bar_" + to_string(i);
+		float scaleY = freq_bin[i] / 1000000;
+		meshes[meshName].get_transform().scale = vec3(1.0f, scaleY, 1.0f);
+	}
 
 	// *********************** CAMERA CONTROL *********************
 	// The ratio of pixels to rotation - remember the FOV
@@ -246,7 +332,7 @@ bool update(float delta_time) {
 	// Use keyboard to move the camera - WSAD
 	if (glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
 		cam.move(vec3(0.0f, 0.0f, 0.5f));
-	}
+	} 
 	if (glfwGetKey(renderer::get_window(), GLFW_KEY_A)) {
 		cam.move(vec3(-0.5f, 0.0f, 0.0f));
 	}
@@ -255,6 +341,14 @@ bool update(float delta_time) {
 	}
 	if (glfwGetKey(renderer::get_window(), GLFW_KEY_D)) {
 		cam.move(vec3(0.5f, 0.0f, 0.0f));
+	}
+
+	// Other keyboard controls
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_C)) {
+		enableColour = 0;
+	}
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_V)) {
+		enableColour = 1;
 	}
 	// Update the camera
 	cam.update(delta_time);
@@ -312,19 +406,30 @@ bool render() {
 		auto MVP = P * V * M;
 		// Set MVP Matrix Uniform
 		glUniformMatrix4fv(light_eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+		// Set Colour Definition Uniform
+		glUniform1i(light_eff.get_uniform_location("isColour"), enableColour); 
 		// Set Normal and Model Matrices:
 		glUniformMatrix4fv(light_eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
 		glUniformMatrix3fv(light_eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(cur_mesh.get_transform().get_normal_matrix()));
 		// Bind Material
-		renderer::bind(cur_mesh.get_material(), "mat");
+		renderer::bind(cur_mesh.get_material(), "mat"); 
 		// Bind lighting model
 		renderer::bind(light, "point");
 
-		if (index.first.find("cube0") != std::string::npos) {
-			renderer::bind(tex_02, 0);
+		if (index.first.find("sun") != std::string::npos) {
+			renderer::bind(tex_sun, 0); 
 		}
-		else 
+		else if(index.first.find("tree") != std::string::npos)
 		{
+			if (index.first.find("left") != std::string::npos) {
+				renderer::bind(tex_tree_l, 0);
+			}
+			else {
+				renderer::bind(tex_tree_r, 0);
+			}
+		} else if(index.first.find("info") != std::string::npos) {
+			renderer::bind(tex_info, 0);
+		} else {
 			renderer::bind(tex_01, 0);
 		}
 
@@ -357,17 +462,27 @@ bool render() {
 
 void main() {
 	// ********************* OPENGL INIT *************************
-	app application("Graphics Coursework");
+	app application("a e s t h e t i c");
 	// Set load content, update and render methods
 	application.set_initialise(initialise);
 	application.set_load_content(load_content);
 	application.set_update(update);
 	application.set_render(render);
 
+	// Initialise the frequency bins with their ranges
+	float audioBarRange = (HIGHEST_RANGE - LOWEST_RANGE)/BIN_COUNT;
+	for (int i = 0; i < BIN_COUNT; i++) {
+		freq_range[i] = audioBarRange*i;
+	}
+
 	// ********************** FFTW INIT **************************
-	int N;
-	fftw_complex *in, *out;
-	fftw_plan my_plan;
+	plan = fftw_plan_dft_1d(CHUNK_SIZE, s_in, s_out, FFTW_FORWARD, FFTW_ESTIMATE);
+	hamming(CHUNK_SIZE, fft_window);
+	for (int i = 0; i < BIN_COUNT; i++) {
+		freq_bin[i] = 0.0;
+		freq_plot[i] = 0.0;
+	}
+	
 
 	// *********************** SDL INIT **************************
 	SDL_Init(SDL_INIT_AUDIO);
@@ -383,8 +498,7 @@ void main() {
 
 	wavSpec.callback = PlayAudioCallback;
 	wavSpec.userdata = &audio;
-
-	plan = fftw_plan_dft_1d(1024, s_in, s_out, FFTW_FORWARD, FFTW_ESTIMATE);
+	
 
 	aDevice = SDL_OpenAudioDevice(NULL, 0, &wavSpec, NULL, SDL_AUDIO_ALLOW_ANY_CHANGE);
 	cout << "Opening Audio Stream" << endl;
@@ -393,9 +507,8 @@ void main() {
 		getchar();		
 	}
 	
-	// ********************** ALL START **************************
+	// ********************** OGL START **************************
 
-	SDL_PauseAudioDevice(aDevice, 0);
 	application.run();
 	
 }
